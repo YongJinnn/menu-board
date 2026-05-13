@@ -27,6 +27,9 @@ func main() {
 	app := fiber.New()
 
 	app.Static("/", "./static")
+	app.Get("/admin", func(c *fiber.Ctx) error {
+		return c.SendFile("./static/admin.html")
+	})
 
 	app.Get("/menu", getMenu)
 	app.Post("/sms", receiveSMS)
