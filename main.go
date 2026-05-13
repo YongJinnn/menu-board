@@ -36,6 +36,10 @@ func main() {
 
 	app.Get("/ws", websocket.New(wsHandler))
 
+	app.Get("/", func(c *fiber.Ctx) error {
+		return c.SendFile("./static/index.html")
+	})
+
 	port := os.Getenv("PORT")
 
 	if port == "" {
