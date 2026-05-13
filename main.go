@@ -26,7 +26,7 @@ func main() {
 
 	app := fiber.New()
 
-	app.Static("/", "./static")
+	//app.Static("/", "./static")
 
 	app.Get("/menu", getMenu)
 
@@ -38,6 +38,10 @@ func main() {
 
 	app.Get("/", func(c *fiber.Ctx) error {
 		return c.SendFile("./static/index.html")
+	})
+
+	app.Get("/admin", func(c *fiber.Ctx) error {
+		return c.SendFile("./static/admin.html")
 	})
 
 	port := os.Getenv("PORT")
