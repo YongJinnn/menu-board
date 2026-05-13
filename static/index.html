@@ -1,63 +1,58 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>오늘의 메뉴</title>
 
-    <meta name="viewport"
-    content="width=device-width, initial-scale=1.0">
+<style>
+body {
+    font-family: Arial;
+    padding: 20px;
+    margin: 0;
+    background: #f2f2f2;
+}
 
-    <meta charset="UTF-8">
-    <title>오늘의 메뉴</title>
+#menu-area {
+    display: flex;
+    gap: 20px;
+    align-items: flex-start;
+}
 
-    <style>
-        body {
-            font-family:Arial;
-            padding:20px;
-            background:#f2f2f2;
-            margin:0;
-        }
+.store {
+    background: white;
+    padding: 20px;
+    border-radius: 15px;
+    width: 48%;
+    box-sizing: border-box;
+}
 
-        .store{
-            background:white;
-            padding:20px;
-            margin-bottom:20px;
-            border-radius:15px;
-            width: 48%;
-            box-sizing: border-box;
-        }
+.store-name {
+    font-size: 28px;
+    font-weight: bold;
+    margin-bottom: 15px;
+}
 
-        .store-name{
-            font-size:28px;
-            font-weight:bold;
-            margin-bottom:15px;
-        }
+.menu-item {
+    font-size: 20px;
+    margin-top: 10px;
+}
 
-        .menu-item{
-            font-size:20px;
-            margin-top:10px;
-        }
+@media (max-width: 768px) {
+    #menu-area {
+        flex-direction: column;
+    }
 
-        #menu-area {
-            display: flex;
-            gap: 20px;
-            justify-content: space-between;
-            align-items: flex-start;
-        }
-
-        @media (max-width: 768px) {
-            #menu-area {
-                flex-direction: column;
-            }
-
-            .store {
-                width: 100%;
-            }
-        }
-    </style>
+    .store {
+        width: 100%;
+    }
+}
+</style>
 </head>
+
 <body>
 
 <h1>오늘의 메뉴</h1>
-
 <h2 id="date"></h2>
 
 <div id="menu-area"></div>
@@ -69,59 +64,38 @@ const socket = new WebSocket("wss://menu-board-2ajt.onrender.com/ws")
 document.getElementById("date").innerText =
     new Date().toISOString().slice(0,10)
 
-socket.onmessage = function(event) {
+socket.onmessage = () => load()
 
-    const data = JSON.parse(event.data)
+async function load() {
 
-    renderMenu(data)
-}
-
-async function firstLoad() {
-
-    const res = await fetch('/menu')
-
+    const res = await fetch("/menu")
     const data = await res.json()
 
-    renderMenu(data)
+    render(data)
 }
 
-function renderMenu(data) {
+function render(data) {
 
-    const area = document.getElementById('menu-area')
-
-    area.innerHTML = ''
+    const area = document.getElementById("menu-area")
+    area.innerHTML = ""
 
     for (const store in data) {
 
-        const div = document.createElement('div')
+        const div = document.createElement("div")
+        div.className = "store"
 
-        div.className = 'store'
-
-        let html =
-        `
-        <div class="store-name">
-        ${store}
-        </div>
-        `
+        let html = `<div class="store-name">${store}</div>`
 
         data[store].forEach(menu => {
-
-            html +=
-            `
-            <div class="menu-item">
-            - ${menu}
-            </div>
-            `
-
+            html += `<div class="menu-item">- ${menu}</div>`
         })
 
         div.innerHTML = html
-
         area.appendChild(div)
     }
 }
 
-firstLoad()
+load()
 
 </script>
 

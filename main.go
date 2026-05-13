@@ -1,190 +1,174 @@
 package main
 
 import (
-	"encoding/json"
+	"database/sql"
 	"fmt"
 	"os"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/gofiber/contrib/websocket"
 	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/websocket/v2"
+	_ "modernc.org/sqlite"
 )
 
 var (
-	menuMap = map[string]map[string][]string{}
-	mutex   sync.Mutex
+	db *sql.DB
 
 	clients = make(map[*websocket.Conn]bool)
-
-	fileName = "menu.json"
+	mutex   sync.Mutex
 )
 
 func main() {
 
-	loadMenu()
+	initDB()
 
 	app := fiber.New()
 
-	//app.Static("/", "./static")
+	app.Static("/", "./static")
 
 	app.Get("/menu", getMenu)
-
 	app.Post("/sms", receiveSMS)
-
 	app.Post("/clear", clearMenu)
 
 	app.Get("/ws", websocket.New(wsHandler))
 
-	app.Get("/", func(c *fiber.Ctx) error {
-		return c.SendFile("./static/index.html")
-	})
+	app.Listen(getPort())
+}
 
-	app.Get("/admin", func(c *fiber.Ctx) error {
-		return c.SendFile("./static/admin.html")
-	})
-
+// ---------------- PORT ----------------
+func getPort() string {
 	port := os.Getenv("PORT")
-
 	if port == "" {
 		port = "8080"
 	}
-
-	app.Listen(":" + port)
+	return ":" + port
 }
 
-func loadMenu() {
-
-	data, err := os.ReadFile(fileName)
-
+// ---------------- DB INIT ----------------
+func initDB() {
+	var err error
+	db, err = sql.Open("sqlite", "./menu.db")
 	if err != nil {
-
-		menuMap = map[string]map[string][]string{}
-
-		return
+		panic(err)
 	}
 
-	json.Unmarshal(data, &menuMap)
+	sqlStmt := `
+	CREATE TABLE IF NOT EXISTS menus (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		date TEXT,
+		store TEXT,
+		menu TEXT
+	);
+	`
+
+	db.Exec(sqlStmt)
 }
 
-func saveMenu() {
-
-	data, _ := json.MarshalIndent(menuMap, "", "  ")
-
-	os.WriteFile(fileName, data, 0644)
-}
-
+// ---------------- WS ----------------
 func wsHandler(c *websocket.Conn) {
 
 	clients[c] = true
 
 	defer func() {
-
 		delete(clients, c)
-
 		c.Close()
 	}()
 
 	for {
-
 		if _, _, err := c.ReadMessage(); err != nil {
-
 			break
 		}
 	}
 }
 
-func broadcastMenu() {
+func broadcast() {
 
 	mutex.Lock()
 	defer mutex.Unlock()
 
-	for client := range clients {
-
-		client.WriteJSON(menuMap)
+	for c := range clients {
+		c.WriteMessage(websocket.TextMessage, []byte("update"))
 	}
 }
 
+// ---------------- SMS ----------------
 func receiveSMS(c *fiber.Ctx) error {
 
-	type Request struct {
+	type Req struct {
 		Message string `json:"message"`
 	}
 
-	req := new(Request)
-
-	if err := c.BodyParser(req); err != nil {
-
-		return c.Status(400).SendString(err.Error())
-	}
-
-	fmt.Println("문자 수신:")
-	fmt.Println(req.Message)
+	req := new(Req)
+	c.BodyParser(req)
 
 	parseMessage(req.Message)
 
-	broadcastMenu()
+	broadcast()
 
 	return c.SendString("OK")
 }
 
-func getToday() string {
-	return time.Now().Format("2006-01-02")
-}
-
 func parseMessage(msg string) {
 
-	mutex.Lock()
-	defer mutex.Unlock()
-
 	lines := strings.Split(msg, "\n")
-
 	if len(lines) < 2 {
 		return
 	}
 
-	date := getToday()
+	date := time.Now().Format("2006-01-02")
 	store := strings.TrimSpace(lines[0])
 
-	if menuMap[date] == nil {
-		menuMap[date] = map[string][]string{}
-	}
-
-	menuMap[date][store] = nil
+	// 기존 삭제
+	db.Exec("DELETE FROM menus WHERE date=? AND store=?", date, store)
 
 	for _, line := range lines[1:] {
 
 		line = strings.TrimSpace(line)
-
 		if line == "" {
 			continue
 		}
 
-		menuMap[date][store] = append(menuMap[date][store], line)
+		db.Exec(
+			"INSERT INTO menus(date, store, menu) VALUES(?, ?, ?)",
+			date, store, line,
+		)
 	}
 
-	saveMenu()
+	fmt.Println("저장 완료:", store)
 }
 
+// ---------------- GET MENU ----------------
 func getMenu(c *fiber.Ctx) error {
-	return c.JSON(menuMap[getToday()])
+
+	date := time.Now().Format("2006-01-02")
+
+	rows, _ := db.Query(
+		"SELECT store, menu FROM menus WHERE date=?",
+		date,
+	)
+
+	result := map[string][]string{}
+
+	for rows.Next() {
+		var store, menu string
+		rows.Scan(&store, &menu)
+
+		result[store] = append(result[store], menu)
+	}
+
+	return c.JSON(result)
 }
 
+// ---------------- CLEAR ----------------
 func clearMenu(c *fiber.Ctx) error {
 
-	mutex.Lock()
-	defer mutex.Unlock()
+	date := time.Now().Format("2006-01-02")
 
-	menuMap[getToday()] = map[string][]string{}
-	saveMenu()
+	db.Exec("DELETE FROM menus WHERE date=?", date)
 
-	for client := range clients {
-
-		client.WriteJSON(menuMap)
-	}
-
-	fmt.Println("전체 메뉴 삭제 완료")
+	broadcast()
 
 	return c.SendString("OK")
 }
