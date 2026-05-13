@@ -21,6 +21,8 @@
             padding:20px;
             margin-bottom:20px;
             border-radius:15px;
+            width: 48%;
+            box-sizing: border-box;
         }
 
         .store-name{
@@ -32,6 +34,23 @@
         .menu-item{
             font-size:20px;
             margin-top:10px;
+        }
+
+        #menu-area {
+            display: flex;
+            gap: 20px;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+
+        @media (max-width: 768px) {
+            #menu-area {
+                flex-direction: column;
+            }
+
+            .store {
+                width: 100%;
+            }
         }
     </style>
 </head>
