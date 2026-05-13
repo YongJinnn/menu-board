@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+
+    <meta name="viewport"
+    content="width=device-width, initial-scale=1.0">
+
+    <meta charset="UTF-8">
+    <title>오늘의 메뉴</title>
+
+    <style>
+        body {
+            font-family:Arial;
+            padding:20px;
+            background:#f2f2f2;
+            margin:0;
+        }
+
+        .store{
+            background:white;
+            padding:20px;
+            margin-bottom:20px;
+            border-radius:15px;
+        }
+
+        .store-name{
+            font-size:28px;
+            font-weight:bold;
+            margin-bottom:15px;
+        }
+
+        .menu-item{
+            font-size:20px;
+            margin-top:10px;
+        }
+    </style>
+</head>
+<body>
+
+<h1>오늘의 메뉴</h1>
+
+<div id="menu-area"></div>
+
+<script>
+
+const socket = new WebSocket("ws://localhost:8080/ws")
+
+socket.onmessage = function(event) {
+
+    const data = JSON.parse(event.data)
+
+    renderMenu(data)
+}
+
+async function firstLoad() {
+
+    const res = await fetch('/menu')
+
+    const data = await res.json()
+
+    renderMenu(data)
+}
+
+function renderMenu(data) {
+
+    const area = document.getElementById('menu-area')
+
+    area.innerHTML = ''
+
+    for (const store in data) {
+
+        const div = document.createElement('div')
+
+        div.className = 'store'
+
+        let html =
+        `
+        <div class="store-name">
+        ${store}
+        </div>
+        `
+
+        data[store].forEach(menu => {
+
+            html +=
+            `
+            <div class="menu-item">
+            - ${menu}
+            </div>
+            `
+
+        })
+
+        div.innerHTML = html
+
+        area.appendChild(div)
+    }
+}
+
+firstLoad()
+
+</script>
+
+</body>
+</html>

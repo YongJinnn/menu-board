@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta name="viewport"
+    content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8">
+    <title>메뉴 관리자</title>
+
+    <style>
+
+    body{
+        font-family: Arial;
+        padding:40px;
+        background:#f2f2f2;
+    }
+
+    .container{
+        background:white;
+        padding:30px;
+        border-radius:10px;
+        max-width:500px;
+    }
+
+    input,
+    select,
+    textarea,
+    button{
+        width:100%;
+        margin-top:15px;
+        padding:12px;
+        font-size:16px;
+        box-sizing:border-box;
+    }
+
+    textarea{
+        height:200px;
+    }
+
+    button{
+        cursor:pointer;
+    }
+
+    </style>
+
+</head>
+<body>
+
+<div id="login-box" class="container">
+
+<h1>관리자 로그인</h1>
+
+<input
+type="password"
+id="password"
+placeholder="비밀번호 입력"
+autofocus
+onkeydown="handleEnter(event)"
+/>
+
+<button onclick="login()">
+로그인
+</button>
+
+</div>
+
+<div
+id="admin-box"
+class="container"
+style="display:none;"
+>
+
+<h1>메뉴 관리자</h1>
+
+<select id="store">
+
+<option>미가촌</option>
+<option>향기네</option>
+
+</select>
+
+<textarea
+id="menus"
+placeholder="메뉴를 한 줄씩 입력하세요"
+></textarea>
+
+<button onclick="saveMenu()">
+저장
+</button>
+
+<button onclick="clearMenu()">
+전체 삭제
+</button>
+
+</div>
+
+<script>
+
+const ADMIN_PASSWORD = "123"
+
+function login(){
+
+    const password =
+        document.getElementById('password').value
+
+    if(password === ADMIN_PASSWORD){
+
+    localStorage.setItem('admin-login','true')
+
+    showAdmin()
+    }
+    else{
+
+        alert('비밀번호 틀림')
+    }
+}
+
+async function saveMenu(){
+
+    const store =
+        document.getElementById('store').value
+
+    const menus =
+        document.getElementById('menus').value
+
+    const message =
+        store + "\n" + menus
+
+    const res = await fetch('/sms',{
+
+        method:'POST',
+
+        headers:{
+            'Content-Type':'application/json'
+        },
+
+        body:JSON.stringify({
+            message:message
+        })
+    })
+
+    if(res.ok){
+
+        alert('저장 완료')
+
+        document.getElementById('menus').value=''
+    }
+}
+
+async function clearMenu(){
+
+    const ok = confirm('전체 메뉴 삭제할까요?')
+
+    if(!ok){
+        return
+    }
+
+    const res = await fetch('/clear',{
+
+        method:'POST'
+    })
+
+    if(res.ok){
+
+        alert('전체 삭제 완료')
+    }
+}
+
+function handleEnter(event){
+
+    if(event.key === 'Enter'){
+
+        login()
+    }
+}
+
+function showAdmin(){
+
+    document.getElementById('login-box').style.display='none'
+
+    document.getElementById('admin-box').style.display='block'
+}
+
+if(localStorage.getItem('admin-login') === 'true'){
+
+    showAdmin()
+}
+
+</script>
+
+</body>
+</html>
