@@ -6,13 +6,14 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/websocket/v2"
 )
 
 var (
-	menuMap = map[string][]string{}
+	menuMap = map[string]map[string][]string{}
 	mutex   sync.Mutex
 
 	clients = make(map[*websocket.Conn]bool)
@@ -59,7 +60,7 @@ func loadMenu() {
 
 	if err != nil {
 
-		menuMap = map[string][]string{}
+		menuMap = map[string]map[string][]string{}
 
 		return
 	}
@@ -128,6 +129,10 @@ func receiveSMS(c *fiber.Ctx) error {
 	return c.SendString("OK")
 }
 
+func getToday() string {
+	return time.Now().Format("2006-01-02")
+}
+
 func parseMessage(msg string) {
 
 	mutex.Lock()
@@ -136,34 +141,34 @@ func parseMessage(msg string) {
 	lines := strings.Split(msg, "\n")
 
 	if len(lines) < 2 {
-
 		return
 	}
 
+	date := getToday()
 	store := strings.TrimSpace(lines[0])
 
-	menuMap[store] = nil
+	if menuMap[date] == nil {
+		menuMap[date] = map[string][]string{}
+	}
+
+	menuMap[date][store] = nil
 
 	for _, line := range lines[1:] {
 
 		line = strings.TrimSpace(line)
 
 		if line == "" {
-
 			continue
 		}
 
-		menuMap[store] = append(menuMap[store], line)
+		menuMap[date][store] = append(menuMap[date][store], line)
 	}
 
 	saveMenu()
-
-	fmt.Println("저장 완료:", store)
 }
 
 func getMenu(c *fiber.Ctx) error {
-
-	return c.JSON(menuMap)
+	return c.JSON(menuMap[getToday()])
 }
 
 func clearMenu(c *fiber.Ctx) error {
@@ -171,8 +176,7 @@ func clearMenu(c *fiber.Ctx) error {
 	mutex.Lock()
 	defer mutex.Unlock()
 
-	menuMap = map[string][]string{}
-
+	menuMap[getToday()] = map[string][]string{}
 	saveMenu()
 
 	for client := range clients {

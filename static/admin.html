@@ -71,6 +71,8 @@ style="display:none;"
 
 <h1>메뉴 관리자</h1>
 
+<h2>오늘 날짜: <span id="date"></span></h2>
+
 <select id="store">
 
 <option>미가촌</option>
@@ -96,6 +98,9 @@ placeholder="메뉴를 한 줄씩 입력하세요"
 <script>
 
 const ADMIN_PASSWORD = "123"
+
+document.getElementById("date").innerText =
+    new Date().toISOString().slice(0,10)
 
 function login(){
 
