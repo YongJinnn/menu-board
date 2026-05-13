@@ -1,15 +1,14 @@
 package main
 
 import (
-	"database/sql"
+	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 	"sync"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/websocket/v2"
-
-	_ "modernc.org/sqlite"
 )
 
 var (
@@ -18,13 +17,12 @@ var (
 
 	clients = make(map[*websocket.Conn]bool)
 
-	db *sql.DB
+	fileName = "menu.json"
 )
 
 func main() {
 
-	initDB()
-	loadMenus()
+	loadMenu()
 
 	app := fiber.New()
 
@@ -38,56 +36,34 @@ func main() {
 
 	app.Get("/ws", websocket.New(wsHandler))
 
-	app.Listen(":8080")
-}
+	port := os.Getenv("PORT")
 
-func initDB() {
-
-	var err error
-
-	db, err = sql.Open("sqlite", "./menu.db")
-
-	if err != nil {
-		panic(err)
+	if port == "" {
+		port = "8080"
 	}
 
-	query := `
-	CREATE TABLE IF NOT EXISTS menus (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		store TEXT,
-		menu TEXT
-	)
-	`
-
-	_, err = db.Exec(query)
-
-	if err != nil {
-		panic(err)
-	}
+	app.Listen(":" + port)
 }
 
-func loadMenus() {
+func loadMenu() {
 
-	mutex.Lock()
-	defer mutex.Unlock()
-
-	rows, err := db.Query("SELECT store, menu FROM menus")
+	data, err := os.ReadFile(fileName)
 
 	if err != nil {
+
+		menuMap = map[string][]string{}
+
 		return
 	}
 
-	defer rows.Close()
+	json.Unmarshal(data, &menuMap)
+}
 
-	for rows.Next() {
+func saveMenu() {
 
-		var store string
-		var menu string
+	data, _ := json.MarshalIndent(menuMap, "", "  ")
 
-		rows.Scan(&store, &menu)
-
-		menuMap[store] = append(menuMap[store], menu)
-	}
+	os.WriteFile(fileName, data, 0644)
 }
 
 func wsHandler(c *websocket.Conn) {
@@ -95,12 +71,16 @@ func wsHandler(c *websocket.Conn) {
 	clients[c] = true
 
 	defer func() {
+
 		delete(clients, c)
+
 		c.Close()
 	}()
 
 	for {
+
 		if _, _, err := c.ReadMessage(); err != nil {
+
 			break
 		}
 	}
@@ -112,6 +92,7 @@ func broadcastMenu() {
 	defer mutex.Unlock()
 
 	for client := range clients {
+
 		client.WriteJSON(menuMap)
 	}
 }
@@ -125,6 +106,7 @@ func receiveSMS(c *fiber.Ctx) error {
 	req := new(Request)
 
 	if err := c.BodyParser(req); err != nil {
+
 		return c.Status(400).SendString(err.Error())
 	}
 
@@ -146,12 +128,11 @@ func parseMessage(msg string) {
 	lines := strings.Split(msg, "\n")
 
 	if len(lines) < 2 {
+
 		return
 	}
 
 	store := strings.TrimSpace(lines[0])
-
-	db.Exec("DELETE FROM menus WHERE store = ?", store)
 
 	menuMap[store] = nil
 
@@ -160,25 +141,19 @@ func parseMessage(msg string) {
 		line = strings.TrimSpace(line)
 
 		if line == "" {
+
 			continue
 		}
 
 		menuMap[store] = append(menuMap[store], line)
-
-		db.Exec(
-			"INSERT INTO menus(store, menu) VALUES(?, ?)",
-			store,
-			line,
-		)
 	}
+
+	saveMenu()
 
 	fmt.Println("저장 완료:", store)
 }
 
 func getMenu(c *fiber.Ctx) error {
-
-	mutex.Lock()
-	defer mutex.Unlock()
 
 	return c.JSON(menuMap)
 }
@@ -190,13 +165,10 @@ func clearMenu(c *fiber.Ctx) error {
 
 	menuMap = map[string][]string{}
 
-	_, err := db.Exec("DELETE FROM menus")
-
-	if err != nil {
-		return c.Status(500).SendString(err.Error())
-	}
+	saveMenu()
 
 	for client := range clients {
+
 		client.WriteJSON(menuMap)
 	}
 
